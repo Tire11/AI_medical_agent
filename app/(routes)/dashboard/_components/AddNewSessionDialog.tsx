@@ -16,12 +16,15 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import axios from "axios";
 import DoctorAgentCard, { doctorAgent } from "./DoctorAgentCard";
 import SuggestedDoctorCard from "./SuggestedDoctorCard";
+import { useRouter } from "next/navigation";
 
 function AddNewSessionDialog() {
   const [note, setNote] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [suggestedDoctors, setSuggestedDoctors] = useState<doctorAgent[]>();
   const [selectedDoctor, setSelectedDoctor] = useState<doctorAgent>();
+
+  const router = useRouter();
   const OnClickNext = async () => {
     setLoading(true);
     const result = await axios.post("/api/suggest-doctors", { notes: note });
@@ -31,8 +34,20 @@ function AddNewSessionDialog() {
     setLoading(false);
   };
 
-  const onStartConsultation = () => {
+  const onStartConsultation = async () => {
+    setLoading(true);
     //Save all info to db
+    const result = await axios.post("/api/session-chat", {
+      notes: note,
+      selectedDoctor: selectedDoctor,
+    });
+    console.log(result.data);
+    if (result.data.sessionId) {
+      console.log(result.data.sessionId);
+      //Route new conversation screen
+      router.push("/dashboard/medical-agent/" + result.data.sessionId);
+    }
+    setLoading(false);
   };
 
   return (
@@ -64,6 +79,8 @@ function AddNewSessionDialog() {
                       key={index}
                       doctor={doctor}
                       setSelectedDoctor={() => setSelectedDoctor(doctor)}
+                      // @ts-ignore
+                      selectedDoctor={selectedDoctor}
                     />
                   ))}
                 </div>
@@ -81,8 +98,12 @@ function AddNewSessionDialog() {
               {loading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
             </Button>
           ) : (
-            <Button onClick={() => onStartConsultation()}>
+            <Button
+              disabled={loading || !selectedDoctor}
+              onClick={() => onStartConsultation()}
+            >
               Start Consultation
+              {loading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
             </Button>
           )}
         </DialogFooter>
