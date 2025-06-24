@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { IconArrowRight } from "@tabler/icons-react";
 import Image from "next/image";
 import React from "react";
 
@@ -25,7 +26,9 @@ export default function DoctorAgentCard({ doctor }: props) {
       />
       <h2 className="font-bold mt-1">{doctor.specialist}</h2>
       <p className="line-clamp-2 text-sm text-gray-500">{doctor.description}</p>
-      <Button className="w-full mt-2">Start Consultation</Button>
+      <Button className="w-full mt-2">
+        Start Consultation <IconArrowRight />
+      </Button>
     </div>
   );
 }
