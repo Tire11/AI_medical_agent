@@ -3,10 +3,10 @@ import axios from "axios";
 import { useParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { doctorAgent } from "../../_components/DoctorAgentCard";
-import { Circle, PhoneCall } from "lucide-react";
+import { Circle, PhoneCall, PhoneOff } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-
+import Vapi from "@vapi-ai/web";
 type SessionDetail = {
   id: number;
   notes: string;
@@ -15,9 +15,21 @@ type SessionDetail = {
   selectedDoctor: doctorAgent;
   createdOn: string;
 };
+
+type messages = {
+  role: string;
+  text: string;
+};
+
 function MedicalVoiceAgent() {
   const { sessionId } = useParams();
   const [sessionDetail, setSessionDetail] = useState<SessionDetail>();
+  const [callStarted, setCallStarted] = useState(false);
+  const [vapiInstance, setVapiInstance] = useState<any>();
+  const [currentRoll, setCurrentRoll] = useState<string | null>();
+  const [liveTranscript, setLiveTranscript] = useState<string>();
+  const [messages, setMessages] = useState<messages[]>([]);
+
   useEffect(() => {
     sessionId && GetSessionDetails();
   }, [sessionId]);
@@ -28,11 +40,70 @@ function MedicalVoiceAgent() {
     setSessionDetail(result.data);
   };
 
+  const StartCall = () => {
+    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_API_KEY!);
+    setVapiInstance(vapi);
+    vapi.start(process.env.NEXT_PUBLIC_VAPI_VOICE_ASSISTANT_ID);
+    // Listen for events
+    vapi.on("call-start", () => {
+      console.log("Call started");
+      setCallStarted(true);
+    });
+    vapi.on("call-end", () => {
+      console.log("Call ended");
+      setCallStarted(false);
+    });
+    vapi.on("message", (message) => {
+      if (message.type === "transcript") {
+        const { role, transcriptType, transcript } = message;
+        console.log(`${message.role}: ${message.transcript}`);
+        if (transcriptType == "partial") {
+          setLiveTranscript(transcript);
+          setCurrentRoll(role);
+        } else if (transcriptType == "final") {
+          // Final transcript
+          setMessages((prev: any) => [
+            ...prev,
+            { role: role, text: transcript },
+          ]);
+          setLiveTranscript("");
+          setCurrentRoll(null);
+        }
+      }
+    });
+
+    vapiInstance.on("speech-start", () => {
+      console.log("Assistant started speaking");
+      setCurrentRoll("assistant");
+    });
+    vapiInstance.on("speech-end", () => {
+      console.log("Assistant stopped speaking");
+      setCurrentRoll("user");
+    });
+  };
+
+  const endCall = () => {
+    if (!vapiInstance) return;
+    vapiInstance.stop();
+
+    vapiInstance.off("call-start");
+    vapiInstance.off("call-end");
+    vapiInstance.off("message");
+
+    setCallStarted(false);
+    setVapiInstance(null);
+  };
+
   return (
     <div className="p-5 border rounded-3xl bg-secondary">
       <div className="flex items-center justify-between">
         <h2 className="p-1 px-2 border rounded-md flex gap-2 items-center">
-          <Circle className="h-4 w-4" /> Not Connected
+          <Circle
+            className={`h-4 w-4 rounded-full ${
+              callStarted ? "bg-green-500" : "bg-red-500"
+            }`}
+          />
+          {callStarted ? "Connected..." : "Not Connected"}
         </h2>
         <h2 className="font-bold text-xl text-gray-400">00:00</h2>
       </div>
@@ -50,15 +121,30 @@ function MedicalVoiceAgent() {
           </h2>
           <p className="text-sm text-gray-400">AI Medical Voice Agent</p>
 
-          <div className="mt-32">
-            <h2 className="text-gray-400">Assistant Msg</h2>
-            <h2 className="text-lg">User Msg</h2>
+          <div className="mt-12 overflow-y-auto flex flex-col items-center px-10 md:px-28 lg:px-52 xl:px-72">
+            {messages?.slice(-4).map((msg: messages, index) => (
+              <h2 className="text-gray-400 p-2" key={index}>
+                {msg.role}: {msg.text}
+              </h2>
+            ))}
+            {liveTranscript && liveTranscript?.length > 0 && (
+              <h2 className="text-lg">
+                {currentRoll}: {liveTranscript}
+              </h2>
+            )}
           </div>
 
-          <Button className="mt-20">
-            <PhoneCall />
-            Start Call
-          </Button>
+          {!callStarted ? (
+            <Button className="mt-20" onClick={StartCall}>
+              <PhoneCall />
+              Start Call
+            </Button>
+          ) : (
+            <Button variant={"destructive"} onClick={endCall}>
+              <PhoneOff />
+              Disconnect
+            </Button>
+          )}
         </div>
       )}
     </div>
