@@ -122,7 +122,9 @@ const Navbar = () => {
       ) : (
         <div className="flex gap-5 items-center">
           <UserButton />
-          <Button>Dashboard</Button>
+          <Button>
+            <Link href="/dashboard">Dashboard</Link>
+          </Button>
         </div>
       )}
     </nav>
